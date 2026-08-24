@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
+  <meta
+    name="theme-color"
+    content="#0b0710"
+  >
+
+  <meta
+    name="description"
+    content="Meow World — a private little universe 🐾"
+  >
+
+  <title>Meow World 🐾</title>
+
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
+</head>
+
+<body>
+
+  <!-- =====================================================
+       GLOBAL FIREWORKS CANVAS
+       ===================================================== -->
+
+  <canvas
+    id="fireworks"
+    aria-hidden="true"
+  ></canvas>
+
+
+  <!-- =====================================================
+       FLOATING DECORATIONS
+       Hearts / Flowers / Ribbons / Paw Prints
+       ===================================================== -->
+
+  <div
+    id="floatLayer"
+    aria-hidden="true"
+  ></div>
+
+
+  <!-- =====================================================
+       PAGE TRANSITION LAYER
+       Rainbow + Photos + Plane
+       ===================================================== -->
+
+  <div
+    id="transitionLayer"
+    aria-hidden="true"
+  ></div>
+
+
+  <!-- =====================================================
+       LOGIN SCREEN
+       ===================================================== -->
+
+  <section
+    id="loginScreen"
+    class="login-screen"
+  >
+
+    <div class="login-card glass">
+
+      <!-- Profile Picture -->
+
+      <div class="dp-ring">
+
+        <img
+          src="assets/images/login/dp.jpg"
+          onerror="this.src='assets/cats/login-cat.svg'"
+          alt="Meow World"
+        >
+
+      </div>
+
+
+      <!-- Small Heading -->
+
+      <div class="eyebrow">
+        A PRIVATE LITTLE UNIVERSE
+      </div>
+
+
+      <!-- Login Title -->
+
+      <h1>
+        LOGIN <span>✦</span>
+      </h1>
+
+
+      <p>
+        to explore the
+        <strong>Meow World</strong>
+      </p>
+
+
+      <!-- ID -->
+
+      <label for="loginId">
+        ID
+      </label>
+
+      <input
+        id="loginId"
+        type="text"
+        placeholder="Meow Real Name"
+        autocomplete="off"
+        spellcheck="false"
+      >
+
+
+      <!-- Password -->
+
+      <label for="loginPass">
+        PASSWORD
+      </label>
+
+      <input
+        id="loginPass"
+        type="password"
+        placeholder="DD-MM-YYYY"
+        autocomplete="off"
+      >
+
+
+      <!-- Hint -->
+
+      <div class="hint">
+        Hint :
+        <b>The Day We Met</b>
+      </div>
+
+
+      <!-- Login Button -->
+
+      <button
+        id="loginBtn"
+        class="primary"
+        type="button"
+      >
+        ENTER THE MEOW WORLD →
+      </button>
+
+
+      <!-- Login Message -->
+
+      <div
+        id="loginMsg"
+        aria-live="polite"
+      ></div>
+
+
+      <!-- Footer -->
+
+      <small>
+        No spoilers.
+        Bas ek-ek surprise discover karna hai. 🐾
+      </small>
+
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       MAIN APPLICATION
+       ===================================================== -->
+
+  <div
+    id="app"
+    class="hidden"
+  >
+
+    <!-- ===================================================
+         TOP BAR
+         =================================================== -->
+
+    <header class="topbar glass">
+
+      <!-- Brand -->
+
+      <button
+        class="brand"
+        type="button"
+        onclick="render(0)"
+        aria-label="Go to Meow World home"
+      >
+        🐾 MEOW WORLD
+      </button>
+
+
+      <!-- Story Progress -->
+
+      <div
+        class="progress"
+        aria-label="Story progress"
+      >
+
+        <span id="progress"></span>
+
+      </div>
+
+
+      <!-- =================================================
+           MUSIC CONTROLS
+           ================================================= -->
+
+      <div class="music">
+
+        <!-- Current Track -->
+
+        <span id="trackName">
+          Music
+        </span>
+
+
+        <!-- Previous Track -->
+
+        <button
+          id="prevTrack"
+          type="button"
+          aria-label="Previous song"
+          title="Previous song"
+        >
+          ◀
+        </button>
+
+
+        <!-- Play / Pause -->
+
+        <button
+          id="playTrack"
+          type="button"
+          aria-label="Play or pause"
+          title="Play / Pause"
+        >
+          ▶
+        </button>
+
+
+        <!-- Next Track -->
+
+        <button
+          id="nextTrack"
+          type="button"
+          aria-label="Next song"
+          title="Next song"
+        >
+          ▷
+        </button>
+
+
+        <!-- Volume -->
+
+        <input
+          id="volume"
+          type="range"
+          min="0"
+          max="1"
+          value="0.65"
+          step="0.01"
+          aria-label="Volume"
+          title="Volume"
+        >
+
+      </div>
+
+    </header>
+
+
+    <!-- ===================================================
+         STORY
+         
+         IMPORTANT:
+         Only 7 pages are rendered by script.js.
+         Page 8 / Game is NOT included.
+         =================================================== -->
+
+    <main
+      id="story"
+      aria-live="polite"
+    ></main>
+
+  </div>
+
+
+  <!-- =====================================================
+       MAIN AUDIO PLAYER
+       
+       script.js controls:
+       - 7 page music
+       - 2-second page audio
+       - fireworks.mp3 on final fireworks page
+       - automatic fireworks.mp3 replay
+       ===================================================== -->
+
+  <audio
+    id="audio"
+    preload="auto"
+  ></audio>
+
+
+  <!-- =====================================================
+       MAIN JAVASCRIPT
+       
+       IMPORTANT:
+       Keep script.js at the bottom so all HTML elements
+       are available before JavaScript starts.
+       ===================================================== -->
+
+  <script src="script.js"></script>
+
+</body>
+
+</html>
