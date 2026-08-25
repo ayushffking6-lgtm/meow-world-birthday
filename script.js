@@ -1,10 +1,24 @@
 /* =========================================================
-   MEOW WORLD — COMPLETE SCRIPT
-   FINAL FIREWORK SYSTEM
-   BIG NEON ROCKET
-   ↓ 2.9 SEC AFTER BIG BURST
-   ↓ 10 NORMAL ROCKETS TOGETHER
-   ↓ RANDOM NORMAL ROCKETS FOR 3 MINUTES
+   MEOW WORLD — OPTIMIZED COMPLETE SCRIPT
+   MOBILE PERFORMANCE OPTIMIZED
+   ---------------------------------------------------------
+   FINAL FIREWORK FLOW:
+
+   Final Page Opens
+        ↓
+   1 SEC WAIT
+        ↓
+   BIG ROCKET LAUNCH
+        ↓
+   BIG ROCKET BURSTS
+        ↓
+   2.9 SEC WAIT
+        ↓
+   10 NORMAL ROCKETS TOGETHER
+        ↓
+   RANDOM NORMAL ROCKETS
+        ↓
+   CONTINUE FOR 3 MINUTES
 ========================================================= */
 
 
@@ -44,47 +58,59 @@ const CONFIG = {
 
 
 /* =========================================================
-   FIREWORK SETTINGS
+   PERFORMANCE SETTINGS
 ========================================================= */
 
 const NORMAL_FIREWORK_DURATION = 12000;
 
-/* FINAL PAGE = 3 MINUTES */
 const FINAL_FIREWORK_DURATION = 180000;
 
-/* Chapter 01 fireworks sound = 5 sec */
+/*
+   Chapter 01 fireworks sound
+*/
 const FIREWORK_SOUND_DURATION = 5000;
 
 /*
-   Final page open hone ke baad
-   1 sec wait
-   phir BIG ROCKET launch
+   Final page opens
+   ↓
+   1 second
+   ↓
+   Big rocket starts
 */
 const FINAL_PAGE_START_DELAY = 1000;
 
 /*
-   Big rocket ascent safety limit
+   Safety limit for big rocket
 */
 const BIG_ROCKET_MAX_DURATION = 6800;
 
 /*
-   BIG ROCKET BURST ke baad
-   EXACT 2.9 SECOND WAIT
-   phir 10 normal rockets
+   Big burst animation itself
 */
-const BIG_ROCKET_SPLASH_DURATION = 2900;
+const BIG_ROCKET_SPLASH_DURATION = 2000;
 
 /*
-   EXACTLY 10 normal rockets together
+   IMPORTANT FINAL DELAY
+
+   Big rocket burst
+   ↓
+   EXACT 2.9 SEC
+   ↓
+   10 normal rockets
+*/
+const BIG_TO_NORMAL_DELAY = 2900;
+
+/*
+   Initial rockets
 */
 const INITIAL_NORMAL_ROCKET_COUNT = 10;
 
 /*
-   Random normal rockets ke beech delay
+   Random rocket delay
 */
-const RANDOM_ROCKET_MIN_DELAY = 650;
+const RANDOM_ROCKET_MIN_DELAY = 800;
 
-const RANDOM_ROCKET_MAX_DELAY = 1350;
+const RANDOM_ROCKET_MAX_DELAY = 1500;
 
 
 /* =========================================================
@@ -164,17 +190,30 @@ const PAGES = [
 ========================================================= */
 
 let current = 0;
+
 let track = 0;
+
 let slide = 0;
+
 let timer = null;
+
 let busy = false;
+
+
+/* =========================================================
+   FIREWORK STATES
+========================================================= */
 
 let normalFireworkRun = null;
 
 let finalFireworkActive = false;
+
 let finalFireworkAnimation = null;
+
 let finalFireworkStartTimer = null;
+
 let finalFireworkAudio = null;
+
 let finalRandomLaunchTimer = null;
 
 
@@ -193,6 +232,134 @@ const fallback =
 
 
 /* =========================================================
+   IMAGE CACHE
+   Only cache images after they are requested.
+========================================================= */
+
+const imageCache =
+    new Map();
+
+
+function preloadImage(src) {
+
+    if (!src) {
+        return;
+    }
+
+    if (imageCache.has(src)) {
+        return imageCache.get(src);
+    }
+
+    const img =
+        new Image();
+
+    img.decoding = "async";
+
+    img.src = src;
+
+    imageCache.set(
+        src,
+        img
+    );
+
+}
+
+
+/* =========================================================
+   LAZY PRELOAD CURRENT PAGE
+========================================================= */
+
+function preloadPageImages(index) {
+
+    const page =
+        PAGES[index];
+
+    if (!page) {
+        return;
+    }
+
+    preloadImage(
+        CONFIG.backgrounds[index]
+    );
+
+    preloadImage(
+        `assets/cats/${page[3]}`
+    );
+
+
+    const folder =
+        page[4];
+
+    const count =
+        page[5];
+
+
+    const limit =
+        Math.min(
+            count,
+            3
+        );
+
+
+    for (
+        let i = 1;
+        i <= limit;
+        i++
+    ) {
+
+        preloadImage(
+            path(
+                folder,
+                i
+            )
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   PRELOAD NEXT PAGE ONLY
+========================================================= */
+
+function preloadNextPage(index) {
+
+    const nextIndex =
+        index + 1;
+
+    if (
+        nextIndex >=
+        PAGES.length
+    ) {
+
+        return;
+
+    }
+
+    /*
+       Delay preload slightly so current
+       page gets priority.
+    */
+
+    setTimeout(() => {
+
+        if (
+            current === index
+        ) {
+
+            preloadPageImages(
+                nextIndex
+            );
+
+        }
+
+    }, 1200);
+
+}
+
+
+/* =========================================================
    FIREWORK AUDIO
 ========================================================= */
 
@@ -201,11 +368,24 @@ function createFireworkAudio() {
     if (!finalFireworkAudio) {
 
         finalFireworkAudio =
-            new Audio(CONFIG.FIREWORK_SOUND);
+            new Audio(
+                CONFIG.FIREWORK_SOUND
+            );
 
-        finalFireworkAudio.preload = "auto";
-        finalFireworkAudio.loop = false;
-        finalFireworkAudio.volume = 0.85;
+        /*
+           IMPORTANT:
+           Do not download entire audio
+           immediately.
+        */
+
+        finalFireworkAudio.preload =
+            "metadata";
+
+        finalFireworkAudio.loop =
+            false;
+
+        finalFireworkAudio.volume =
+            0.85;
 
     }
 
@@ -214,36 +394,60 @@ function createFireworkAudio() {
 }
 
 
+/* =========================================================
+   CHAPTER 01 FIREWORK SOUND
+========================================================= */
+
 function playChapterOneFireworkSound() {
 
-    const sound = createFireworkAudio();
+    const sound =
+        createFireworkAudio();
 
     try {
 
         sound.pause();
+
         sound.currentTime = 0;
+
         sound.loop = false;
+
         sound.volume = 0.85;
 
-        const promise = sound.play();
+        const promise =
+            sound.play();
 
-        if (promise && promise.catch) {
-            promise.catch(() => {});
+        if (
+            promise &&
+            promise.catch
+        ) {
+
+            promise.catch(
+                () => {}
+            );
+
         }
+
 
         setTimeout(() => {
 
             try {
+
                 sound.pause();
+
                 sound.currentTime = 0;
-            } catch (e) {}
+
+            }
+
+            catch (e) {}
 
         }, FIREWORK_SOUND_DURATION);
 
-    } catch (e) {
+    }
+
+    catch (e) {
 
         console.log(
-            "Chapter 01 fireworks sound error:",
+            "Firework sound error:",
             e
         );
 
@@ -252,24 +456,42 @@ function playChapterOneFireworkSound() {
 }
 
 
+/* =========================================================
+   FINAL FIREWORK AUDIO
+========================================================= */
+
 function startFinalFireworkAudio() {
 
-    const sound = createFireworkAudio();
+    const sound =
+        createFireworkAudio();
 
     try {
 
         sound.pause();
+
         sound.currentTime = 0;
+
         sound.loop = true;
+
         sound.volume = 0.85;
 
-        const promise = sound.play();
+        const promise =
+            sound.play();
 
-        if (promise && promise.catch) {
-            promise.catch(() => {});
+        if (
+            promise &&
+            promise.catch
+        ) {
+
+            promise.catch(
+                () => {}
+            );
+
         }
 
-    } catch (e) {
+    }
+
+    catch (e) {
 
         console.log(
             "Final fireworks audio error:",
@@ -281,19 +503,33 @@ function startFinalFireworkAudio() {
 }
 
 
+/* =========================================================
+   STOP AUDIO
+========================================================= */
+
 function stopFinalFireworkAudio() {
 
-    if (!finalFireworkAudio) {
+    if (
+        !finalFireworkAudio
+    ) {
+
         return;
+
     }
 
     try {
 
         finalFireworkAudio.pause();
-        finalFireworkAudio.currentTime = 0;
-        finalFireworkAudio.loop = false;
 
-    } catch (e) {}
+        finalFireworkAudio.currentTime =
+            0;
+
+        finalFireworkAudio.loop =
+            false;
+
+    }
+
+    catch (e) {}
 
 }
 
@@ -305,11 +541,14 @@ function stopFinalFireworkAudio() {
 function resizeCanvas() {
 
     const canvas =
-        document.getElementById("fireworks");
+        document.getElementById(
+            "fireworks"
+        );
 
     if (!canvas) {
         return;
     }
+
 
     const dpr =
         Math.min(
@@ -317,13 +556,49 @@ function resizeCanvas() {
             1.5
         );
 
-    canvas.width = innerWidth * dpr;
-    canvas.height = innerHeight * dpr;
 
-    canvas.style.width = innerWidth + "px";
-    canvas.style.height = innerHeight + "px";
+    /*
+       Avoid unnecessary resize
+    */
 
-    const ctx = canvas.getContext("2d");
+    const targetWidth =
+        Math.floor(
+            innerWidth * dpr
+        );
+
+    const targetHeight =
+        Math.floor(
+            innerHeight * dpr
+        );
+
+
+    if (
+        canvas.width !==
+        targetWidth ||
+        canvas.height !==
+        targetHeight
+    ) {
+
+        canvas.width =
+            targetWidth;
+
+        canvas.height =
+            targetHeight;
+
+        canvas.style.width =
+            innerWidth + "px";
+
+        canvas.style.height =
+            innerHeight + "px";
+
+    }
+
+
+    const ctx =
+        canvas.getContext(
+            "2d"
+        );
+
 
     ctx.setTransform(
         dpr,
@@ -341,14 +616,23 @@ function resizeCanvas() {
    NORMAL BURST
 ========================================================= */
 
-function makeNormalBurst(x, y, count = 95) {
+function makeNormalBurst(
+    x,
+    y,
+    count = 85
+) {
 
     const particles = [];
 
     const baseHue =
         Math.random() * 360;
 
-    for (let i = 0; i < count; i++) {
+
+    for (
+        let i = 0;
+        i < count;
+        i++
+    ) {
 
         const angle =
             Math.PI * 2 * i / count +
@@ -357,6 +641,7 @@ function makeNormalBurst(x, y, count = 95) {
         const speed =
             2.4 +
             Math.random() * 4.8;
+
 
         particles.push({
 
@@ -387,6 +672,7 @@ function makeNormalBurst(x, y, count = 95) {
 
     }
 
+
     return particles;
 
 }
@@ -397,23 +683,34 @@ function makeNormalBurst(x, y, count = 95) {
 ========================================================= */
 
 function fireworks(
-    duration = NORMAL_FIREWORK_DURATION
+    duration =
+        NORMAL_FIREWORK_DURATION
 ) {
 
     const canvas =
-        document.getElementById("fireworks");
+        document.getElementById(
+            "fireworks"
+        );
 
     if (!canvas) {
         return;
     }
 
-    const ctx = canvas.getContext("2d");
+
+    const ctx =
+        canvas.getContext("2d");
+
 
     resizeCanvas();
 
+
     if (normalFireworkRun) {
-        normalFireworkRun.stop = true;
+
+        normalFireworkRun.stop =
+            true;
+
     }
+
 
     const run = {
 
@@ -429,7 +726,9 @@ function fireworks(
 
     };
 
-    normalFireworkRun = run;
+
+    normalFireworkRun =
+        run;
 
 
     function launchRocket() {
@@ -476,9 +775,16 @@ function fireworks(
             return;
         }
 
-        if (!run.rocket && now < run.until) {
+
+        if (
+            !run.rocket &&
+            now < run.until
+        ) {
+
             launchRocket();
+
         }
+
 
         ctx.clearRect(
             0,
@@ -487,21 +793,34 @@ function fireworks(
             innerHeight
         );
 
-        ctx.globalCompositeOperation = "lighter";
 
+        ctx.globalCompositeOperation =
+            "lighter";
+
+
+        /* ROCKET */
 
         if (run.rocket) {
 
-            const r = run.rocket;
+            const r =
+                run.rocket;
+
 
             r.trail.push({
                 x: r.x,
                 y: r.y
             });
 
-            if (r.trail.length > 10) {
+
+            if (
+                r.trail.length >
+                8
+            ) {
+
                 r.trail.shift();
+
             }
+
 
             for (
                 let i = 0;
@@ -509,7 +828,9 @@ function fireworks(
                 i++
             ) {
 
-                const p = r.trail[i];
+                const p =
+                    r.trail[i];
+
 
                 ctx.beginPath();
 
@@ -518,70 +839,97 @@ function fireworks(
                     p.y,
                     Math.max(
                         0.8,
-                        2.5 - i * 0.18
+                        2.5 -
+                        i * 0.18
                     ),
                     0,
                     Math.PI * 2
                 );
+
 
                 ctx.fillStyle =
                     `rgba(
                         255,
                         225,
                         170,
-                        ${1 - i / r.trail.length}
+                        ${1 -
+                            i /
+                            r.trail.length}
                     )`;
+
 
                 ctx.fill();
 
             }
 
+
             r.x += r.vx;
+
             r.y += r.vy;
+
             r.vy += 0.055;
 
-            if (r.y <= r.target) {
+
+            if (
+                r.y <=
+                r.target
+            ) {
 
                 run.bursts.push(
                     ...makeNormalBurst(
                         r.x,
                         r.y,
-                        100
+                        90
                     )
                 );
 
-                run.rocket = null;
+                run.rocket =
+                    null;
 
             }
 
         }
 
 
+        /* PARTICLES */
+
         for (
-            let i = run.bursts.length - 1;
+            let i =
+                run.bursts.length - 1;
             i >= 0;
             i--
         ) {
 
-            const p = run.bursts[i];
+            const p =
+                run.bursts[i];
+
 
             p.x += p.vx;
+
             p.y += p.vy;
 
             p.vy += 0.065;
 
             p.vx *= 0.988;
+
             p.vy *= 0.988;
 
             p.life -= 0.018;
 
-            if (p.life <= 0) {
 
-                run.bursts.splice(i, 1);
+            if (
+                p.life <= 0
+            ) {
+
+                run.bursts.splice(
+                    i,
+                    1
+                );
 
                 continue;
 
             }
+
 
             ctx.beginPath();
 
@@ -593,13 +941,15 @@ function fireworks(
                 Math.PI * 2
             );
 
+
             ctx.fillStyle =
                 `hsla(
                     ${p.hue},
                     100%,
                     70%,
-                    ${Math.max(0, p.life)}
+                    ${p.life}
                 )`;
+
 
             ctx.fill();
 
@@ -609,12 +959,16 @@ function fireworks(
         if (
             now < run.until ||
             run.rocket ||
-            run.bursts.length > 0
+            run.bursts.length
         ) {
 
-            requestAnimationFrame(step);
+            requestAnimationFrame(
+                step
+            );
 
-        } else {
+        }
+
+        else {
 
             ctx.clearRect(
                 0,
@@ -623,8 +977,15 @@ function fireworks(
                 innerHeight
             );
 
-            if (normalFireworkRun === run) {
-                normalFireworkRun = null;
+
+            if (
+                normalFireworkRun ===
+                run
+            ) {
+
+                normalFireworkRun =
+                    null;
+
             }
 
         }
@@ -632,17 +993,28 @@ function fireworks(
     }
 
 
-    requestAnimationFrame(step);
+    requestAnimationFrame(
+        step
+    );
 
 }
 
 
+/* =========================================================
+   STOP NORMAL FIREWORKS
+========================================================= */
+
 function stopNormalFireworks() {
 
-    if (normalFireworkRun) {
+    if (
+        normalFireworkRun
+    ) {
 
-        normalFireworkRun.stop = true;
-        normalFireworkRun = null;
+        normalFireworkRun.stop =
+            true;
+
+        normalFireworkRun =
+            null;
 
     }
 
@@ -653,17 +1025,29 @@ function stopNormalFireworks() {
    BIG NEON BURST
 ========================================================= */
 
-function makeBigNeonBurst(x, y) {
+function makeBigNeonBurst(
+    x,
+    y
+) {
 
     const particles = [];
 
-    const count = 210;
+    /*
+       Slightly reduced from 295
+       for mobile performance.
+    */
+
+    const count = 175;
 
     const baseHue =
         Math.random() * 360;
 
 
-    for (let i = 0; i < count; i++) {
+    for (
+        let i = 0;
+        i < count;
+        i++
+    ) {
 
         const angle =
             Math.random() *
@@ -672,7 +1056,8 @@ function makeBigNeonBurst(x, y) {
 
         const speed =
             4.2 +
-            Math.random() * 7.0;
+            Math.random() * 7;
+
 
         particles.push({
 
@@ -708,9 +1093,16 @@ function makeBigNeonBurst(x, y) {
     }
 
 
-    const ringCount = 85;
+    /* RING */
 
-    for (let i = 0; i < ringCount; i++) {
+    const ringCount = 65;
+
+
+    for (
+        let i = 0;
+        i < ringCount;
+        i++
+    ) {
 
         const angle =
             Math.PI *
@@ -721,6 +1113,7 @@ function makeBigNeonBurst(x, y) {
         const speed =
             7.5 +
             Math.random() * 2.5;
+
 
         particles.push({
 
@@ -737,7 +1130,8 @@ function makeBigNeonBurst(x, y) {
 
             life: 1,
 
-            decay: 0.014,
+            decay:
+                0.014,
 
             size:
                 1.8 +
@@ -752,6 +1146,7 @@ function makeBigNeonBurst(x, y) {
         });
 
     }
+
 
     return particles;
 
@@ -802,22 +1197,36 @@ function createFinalNormalRocket() {
 }
 
 
-function makeFinalNormalBurst(x, y) {
+/* =========================================================
+   FINAL NORMAL BURST
+========================================================= */
+
+function makeFinalNormalBurst(
+    x,
+    y
+) {
 
     return makeNormalBurst(
         x,
         y,
-        80
+        75
     );
 
 }
 
 
-function launchInitialFinalRockets(rockets) {
+/* =========================================================
+   INITIAL 10 ROCKETS
+========================================================= */
+
+function launchInitialFinalRockets(
+    rockets
+) {
 
     for (
         let i = 0;
-        i < INITIAL_NORMAL_ROCKET_COUNT;
+        i <
+        INITIAL_NORMAL_ROCKET_COUNT;
         i++
     ) {
 
@@ -829,6 +1238,10 @@ function launchInitialFinalRockets(rockets) {
 
 }
 
+
+/* =========================================================
+   RANDOM DELAY
+========================================================= */
 
 function randomRocketDelay() {
 
@@ -850,32 +1263,54 @@ function randomRocketDelay() {
 
 function startFinalFireworksLoop() {
 
-    if (finalFireworkActive) {
+    if (
+        finalFireworkActive
+    ) {
+
         return;
+
     }
 
+
     const canvas =
-        document.getElementById("fireworks");
+        document.getElementById(
+            "fireworks"
+        );
+
 
     if (!canvas) {
         return;
     }
 
-    finalFireworkActive = true;
+
+    finalFireworkActive =
+        true;
+
 
     resizeCanvas();
 
+
     const ctx =
-        canvas.getContext("2d");
+        canvas.getContext(
+            "2d"
+        );
+
 
     const rockets = [];
+
     const bursts = [];
+
 
     const finalStart =
         performance.now();
 
-    let finalNormalLaunchStarted = false;
-    let bigRocketFinished = false;
+
+    let finalNormalLaunchStarted =
+        false;
+
+
+    let bigRocketFinished =
+        false;
 
 
     /* =====================================================
@@ -900,7 +1335,8 @@ function startFinalFireworksLoop() {
                 0.5
             ) * 0.25,
 
-        vy: -15.5,
+        vy:
+            -15.5,
 
         target:
             innerHeight * 0.17,
@@ -919,15 +1355,28 @@ function startFinalFireworksLoop() {
     };
 
 
+    /* =====================================================
+       EXPLODE BIG ROCKET
+    ===================================================== */
+
     function explodeBigRocket(now) {
 
-        if (bigRocket.exploded) {
+        if (
+            bigRocket.exploded
+        ) {
+
             return;
+
         }
 
-        bigRocket.exploded = true;
 
-        bigRocket.explosionTime = now;
+        bigRocket.exploded =
+            true;
+
+
+        bigRocket.explosionTime =
+            now;
+
 
         bigRocket.particles =
             makeBigNeonBurst(
@@ -938,34 +1387,58 @@ function startFinalFireworksLoop() {
     }
 
 
+    /* =====================================================
+       DRAW BIG ROCKET
+    ===================================================== */
+
     function drawBigRocket() {
 
-        if (bigRocket.exploded) {
+        if (
+            bigRocket.exploded
+        ) {
+
             return;
+
         }
+
 
         bigRocket.trail.push({
-            x: bigRocket.x,
-            y: bigRocket.y
+
+            x:
+                bigRocket.x,
+
+            y:
+                bigRocket.y
+
         });
 
-        if (bigRocket.trail.length > 22) {
+
+        if (
+            bigRocket.trail.length >
+            18
+        ) {
+
             bigRocket.trail.shift();
+
         }
+
 
         for (
             let i = 0;
-            i < bigRocket.trail.length;
+            i <
+            bigRocket.trail.length;
             i++
         ) {
 
             const p =
                 bigRocket.trail[i];
 
+
             const alpha =
                 1 -
                 i /
                 bigRocket.trail.length;
+
 
             ctx.beginPath();
 
@@ -974,11 +1447,13 @@ function startFinalFireworksLoop() {
                 p.y,
                 Math.max(
                     0.8,
-                    4 - i * 0.16
+                    4 -
+                    i * 0.16
                 ),
                 0,
                 Math.PI * 2
             );
+
 
             ctx.fillStyle =
                 `rgba(
@@ -988,10 +1463,13 @@ function startFinalFireworksLoop() {
                     ${alpha}
                 )`;
 
+
             ctx.fill();
 
         }
 
+
+        /* HEAD */
 
         ctx.beginPath();
 
@@ -1003,11 +1481,15 @@ function startFinalFireworksLoop() {
             Math.PI * 2
         );
 
+
         ctx.fillStyle =
             "rgba(255,255,255,1)";
 
+
         ctx.fill();
 
+
+        /* GLOW */
 
         ctx.beginPath();
 
@@ -1019,26 +1501,42 @@ function startFinalFireworksLoop() {
             Math.PI * 2
         );
 
+
         ctx.fillStyle =
             "rgba(255,190,70,0.22)";
+
 
         ctx.fill();
 
     }
 
 
+    /* =====================================================
+       UPDATE BIG ROCKET
+    ===================================================== */
+
     function updateBigRocket(now) {
 
-        if (bigRocket.exploded) {
+        if (
+            bigRocket.exploded
+        ) {
+
             return;
+
         }
+
 
         drawBigRocket();
 
-        bigRocket.x += bigRocket.vx;
-        bigRocket.y += bigRocket.vy;
 
-        bigRocket.vy += 0.035;
+        bigRocket.x +=
+            bigRocket.vx;
+
+        bigRocket.y +=
+            bigRocket.vy;
+
+        bigRocket.vy +=
+            0.035;
 
 
         if (
@@ -1046,7 +1544,9 @@ function startFinalFireworksLoop() {
             bigRocket.target
         ) {
 
-            explodeBigRocket(now);
+            explodeBigRocket(
+                now
+            );
 
         }
 
@@ -1057,30 +1557,34 @@ function startFinalFireworksLoop() {
             BIG_ROCKET_MAX_DURATION
         ) {
 
-            if (!bigRocket.exploded) {
-                explodeBigRocket(now);
-            }
+            explodeBigRocket(
+                now
+            );
 
         }
 
     }
 
 
+    /* =====================================================
+       UPDATE BIG PARTICLES
+    ===================================================== */
+
     function updateBigParticles(now) {
 
-        if (!bigRocket.exploded) {
+        if (
+            !bigRocket.exploded
+        ) {
+
             return;
+
         }
+
 
         const elapsed =
             now -
             bigRocket.explosionTime;
 
-
-        /*
-           BIG BURST PARTICLES
-           2.9 SEC TAK CLEAR RAHENGE
-        */
 
         const progress =
             Math.min(
@@ -1100,13 +1604,17 @@ function startFinalFireworksLoop() {
             const p =
                 bigRocket.particles[i];
 
+
             p.x += p.vx;
+
             p.y += p.vy;
 
             p.vx *= 0.982;
+
             p.vy *= 0.982;
 
             p.vy += 0.045;
+
 
             p.life =
                 Math.max(
@@ -1115,7 +1623,9 @@ function startFinalFireworksLoop() {
                 );
 
 
-            if (p.life <= 0) {
+            if (
+                p.life <= 0
+            ) {
 
                 bigRocket.particles.splice(
                     i,
@@ -1127,6 +1637,8 @@ function startFinalFireworksLoop() {
             }
 
 
+            /* Glow */
+
             ctx.beginPath();
 
             ctx.arc(
@@ -1137,6 +1649,7 @@ function startFinalFireworksLoop() {
                 Math.PI * 2
             );
 
+
             ctx.fillStyle =
                 `hsla(
                     ${p.hue},
@@ -1145,8 +1658,11 @@ function startFinalFireworksLoop() {
                     ${p.life * 0.12}
                 )`;
 
+
             ctx.fill();
 
+
+            /* Main */
 
             ctx.beginPath();
 
@@ -1158,6 +1674,7 @@ function startFinalFireworksLoop() {
                 Math.PI * 2
             );
 
+
             ctx.fillStyle =
                 `hsla(
                     ${p.hue},
@@ -1166,13 +1683,14 @@ function startFinalFireworksLoop() {
                     ${p.life}
                 )`;
 
+
             ctx.fill();
 
         }
 
 
         /*
-           2.9 SEC COMPLETE
+           Big burst animation finished.
         */
 
         if (
@@ -1180,14 +1698,20 @@ function startFinalFireworksLoop() {
             BIG_ROCKET_SPLASH_DURATION
         ) {
 
-            bigRocket.particles.length = 0;
+            bigRocket.particles.length =
+                0;
 
-            bigRocketFinished = true;
+            bigRocketFinished =
+                true;
 
         }
 
     }
 
+
+    /* =====================================================
+       UPDATE NORMAL ROCKETS
+    ===================================================== */
 
     function updateNormalRockets() {
 
@@ -1198,29 +1722,43 @@ function startFinalFireworksLoop() {
             i--
         ) {
 
-            const r = rockets[i];
+            const r =
+                rockets[i];
 
 
-            if (!r.exploded) {
+            if (
+                !r.exploded
+            ) {
 
                 r.trail.push({
+
                     x: r.x,
+
                     y: r.y
+
                 });
 
-                if (r.trail.length > 9) {
+
+                if (
+                    r.trail.length >
+                    7
+                ) {
+
                     r.trail.shift();
+
                 }
 
 
                 for (
                     let t = 0;
-                    t < r.trail.length;
+                    t <
+                    r.trail.length;
                     t++
                 ) {
 
                     const p =
                         r.trail[t];
+
 
                     ctx.beginPath();
 
@@ -1236,6 +1774,7 @@ function startFinalFireworksLoop() {
                         Math.PI * 2
                     );
 
+
                     ctx.fillStyle =
                         `rgba(
                             255,
@@ -1246,15 +1785,20 @@ function startFinalFireworksLoop() {
                                 r.trail.length}
                         )`;
 
+
                     ctx.fill();
 
                 }
 
 
-                r.x += r.vx;
-                r.y += r.vy;
+                r.x +=
+                    r.vx;
 
-                r.vy += 0.055;
+                r.y +=
+                    r.vy;
+
+                r.vy +=
+                    0.055;
 
 
                 if (
@@ -1268,6 +1812,7 @@ function startFinalFireworksLoop() {
                             r.y
                         )
                     );
+
 
                     rockets.splice(
                         i,
@@ -1283,6 +1828,10 @@ function startFinalFireworksLoop() {
     }
 
 
+    /* =====================================================
+       NORMAL PARTICLES
+    ===================================================== */
+
     function updateNormalParticles() {
 
         for (
@@ -1295,18 +1844,29 @@ function startFinalFireworksLoop() {
             const p =
                 bursts[i];
 
-            p.x += p.vx;
-            p.y += p.vy;
 
-            p.vy += 0.055;
+            p.x +=
+                p.vx;
 
-            p.vx *= 0.989;
-            p.vy *= 0.989;
+            p.y +=
+                p.vy;
 
-            p.life -= 0.018;
+            p.vy +=
+                0.055;
+
+            p.vx *=
+                0.989;
+
+            p.vy *=
+                0.989;
+
+            p.life -=
+                0.018;
 
 
-            if (p.life <= 0) {
+            if (
+                p.life <= 0
+            ) {
 
                 bursts.splice(
                     i,
@@ -1328,6 +1888,7 @@ function startFinalFireworksLoop() {
                 Math.PI * 2
             );
 
+
             ctx.fillStyle =
                 `hsla(
                     ${p.hue},
@@ -1336,6 +1897,7 @@ function startFinalFireworksLoop() {
                     ${p.life}
                 )`;
 
+
             ctx.fill();
 
         }
@@ -1343,14 +1905,27 @@ function startFinalFireworksLoop() {
     }
 
 
+    /* =====================================================
+       RANDOM ROCKET
+    ===================================================== */
+
     function launchRandomNormalRocket() {
 
-        if (!finalFireworkActive) {
+        if (
+            !finalFireworkActive
+        ) {
+
             return;
+
         }
 
-        if (current !== 6) {
+
+        if (
+            current !== 6
+        ) {
+
             return;
+
         }
 
 
@@ -1359,7 +1934,13 @@ function startFinalFireworksLoop() {
         );
 
 
-        if (Math.random() < 0.28) {
+        /*
+           Small chance of double rocket.
+        */
+
+        if (
+            Math.random() < 0.20
+        ) {
 
             rockets.push(
                 createFinalNormalRocket()
@@ -1370,14 +1951,19 @@ function startFinalFireworksLoop() {
     }
 
 
+    /* =====================================================
+       RANDOM SCHEDULER
+    ===================================================== */
+
     function scheduleRandomRocket() {
 
-        if (!finalFireworkActive) {
-            return;
-        }
+        if (
+            !finalFireworkActive ||
+            current !== 6
+        ) {
 
-        if (current !== 6) {
             return;
+
         }
 
 
@@ -1388,16 +1974,18 @@ function startFinalFireworksLoop() {
         finalRandomLaunchTimer =
             setTimeout(() => {
 
-                if (!finalFireworkActive) {
-                    return;
-                }
+                if (
+                    !finalFireworkActive ||
+                    current !== 6
+                ) {
 
-                if (current !== 6) {
                     return;
+
                 }
 
 
                 launchRandomNormalRocket();
+
 
                 scheduleRandomRocket();
 
@@ -1407,17 +1995,23 @@ function startFinalFireworksLoop() {
 
 
     /* =====================================================
-       FINAL ANIMATION
+       ANIMATION
     ===================================================== */
 
     function animate(now) {
 
-        if (!finalFireworkActive) {
+        if (
+            !finalFireworkActive
+        ) {
+
             return;
+
         }
 
 
-        if (current !== 6) {
+        if (
+            current !== 6
+        ) {
 
             stopFinalFireworksLoop();
 
@@ -1425,6 +2019,10 @@ function startFinalFireworksLoop() {
 
         }
 
+
+        /*
+           EXACT 3 MINUTES
+        */
 
         if (
             now -
@@ -1446,24 +2044,36 @@ function startFinalFireworksLoop() {
             innerHeight
         );
 
+
         ctx.globalCompositeOperation =
             "lighter";
 
 
-        /* BIG ROCKET */
+        /* =================================================
+           BIG ROCKET
+        ================================================= */
 
-        if (!bigRocketFinished) {
+        if (
+            !bigRocketFinished
+        ) {
 
-            updateBigRocket(now);
+            updateBigRocket(
+                now
+            );
 
-            updateBigParticles(now);
+            updateBigParticles(
+                now
+            );
 
         }
 
 
         /* =================================================
-           BIG BURST → EXACT 2.9 SEC WAIT
-           → EXACTLY 10 NORMAL ROCKETS
+           BIG BURST
+           ↓
+           EXACT 2.9 SEC WAIT
+           ↓
+           10 ROCKETS
         ================================================= */
 
         if (
@@ -1478,15 +2088,20 @@ function startFinalFireworksLoop() {
 
             if (
                 timeSinceBigBurst >=
-                2900
+                BIG_TO_NORMAL_DELAY
             ) {
 
-                bigRocket.particles.length = 0;
+                /*
+                   Make absolutely sure
+                   big particles are gone.
+                */
+
+                bigRocket.particles.length =
+                    0;
 
 
                 /*
-                   EXACTLY 10 ROCKETS
-                   SAME TIME
+                   EXACTLY 10
                 */
 
                 launchInitialFinalRockets(
@@ -1499,8 +2114,8 @@ function startFinalFireworksLoop() {
 
 
                 /*
-                   RANDOM ROCKETS START
-                   AFTER INITIAL 10
+                   Random rockets start
+                   AFTER initial 10.
                 */
 
                 scheduleRandomRocket();
@@ -1510,7 +2125,13 @@ function startFinalFireworksLoop() {
         }
 
 
-        if (finalNormalLaunchStarted) {
+        /* =================================================
+           NORMAL FIREWORKS
+        ================================================= */
+
+        if (
+            finalNormalLaunchStarted
+        ) {
 
             updateNormalRockets();
 
@@ -1541,38 +2162,48 @@ function startFinalFireworksLoop() {
 
 function stopFinalFireworksLoop() {
 
-    finalFireworkActive = false;
+    finalFireworkActive =
+        false;
 
 
-    if (finalFireworkAnimation) {
+    if (
+        finalFireworkAnimation
+    ) {
 
         cancelAnimationFrame(
             finalFireworkAnimation
         );
 
-        finalFireworkAnimation = null;
+        finalFireworkAnimation =
+            null;
 
     }
 
 
-    if (finalFireworkStartTimer) {
+    if (
+        finalFireworkStartTimer
+    ) {
 
         clearTimeout(
             finalFireworkStartTimer
         );
 
-        finalFireworkStartTimer = null;
+        finalFireworkStartTimer =
+            null;
 
     }
 
 
-    if (finalRandomLaunchTimer) {
+    if (
+        finalRandomLaunchTimer
+    ) {
 
         clearTimeout(
             finalRandomLaunchTimer
         );
 
-        finalRandomLaunchTimer = null;
+        finalRandomLaunchTimer =
+            null;
 
     }
 
@@ -1589,7 +2220,10 @@ function stopFinalFireworksLoop() {
     if (canvas) {
 
         const ctx =
-            canvas.getContext("2d");
+            canvas.getContext(
+                "2d"
+            );
+
 
         ctx.clearRect(
             0,
@@ -1615,7 +2249,7 @@ function startFinalPageEffect() {
     /*
        FINAL PAGE
        ↓
-       1 SECOND WAIT
+       1 SEC
        ↓
        BIG ROCKET
     */
@@ -1623,8 +2257,12 @@ function startFinalPageEffect() {
     finalFireworkStartTimer =
         setTimeout(() => {
 
-            if (current !== 6) {
+            if (
+                current !== 6
+            ) {
+
                 return;
+
             }
 
 
@@ -1643,9 +2281,14 @@ function startFinalPageEffect() {
 
 function pageFireworks() {
 
-    if (current === 6) {
+    if (
+        current === 6
+    ) {
+
         return;
+
     }
+
 
     fireworks(
         NORMAL_FIREWORK_DURATION
@@ -1658,7 +2301,10 @@ function pageFireworks() {
    PATH
 ========================================================= */
 
-function path(folder, n) {
+function path(
+    folder,
+    n
+) {
 
     return `assets/images/${folder}/image-${String(n).padStart(2, "0")}.jpg`;
 
@@ -1676,12 +2322,14 @@ function floats() {
             "floatLayer"
         );
 
+
     if (!layer) {
         return;
     }
 
 
     const chars = [
+
         "♡",
         "♥",
         "✦",
@@ -1691,18 +2339,40 @@ function floats() {
         "🎀",
         "✿",
         "🐾"
+
     ];
 
 
+    /*
+       Slightly slower creation
+       = better mobile performance.
+    */
+
     setInterval(() => {
+
+        /*
+           Don't create unlimited elements.
+        */
+
+        if (
+            layer.children.length >
+            18
+        ) {
+
+            return;
+
+        }
+
 
         const element =
             document.createElement(
                 "span"
             );
 
+
         element.className =
             "floater";
+
 
         element.textContent =
             chars[
@@ -1712,16 +2382,19 @@ function floats() {
                 )
             ];
 
+
         element.style.left =
             Math.random() *
             100 +
             "vw";
+
 
         element.style.fontSize =
             12 +
             Math.random() *
             22 +
             "px";
+
 
         element.style.setProperty(
             "--dx",
@@ -1732,6 +2405,7 @@ function floats() {
             "vw"
         );
 
+
         element.style.setProperty(
             "--rot",
             (
@@ -1741,37 +2415,53 @@ function floats() {
             "deg"
         );
 
+
         element.style.animationDuration =
             8 +
             Math.random() *
             8 +
             "s";
 
+
         layer.appendChild(
             element
         );
 
+
         setTimeout(
-            () => element.remove(),
+            () => {
+                element.remove();
+            },
             17000
         );
 
-    }, 650);
+
+    }, 850);
 
 }
 
 
 /* =========================================================
-   SLIDESHOW
+   SLIDESHOW MARKUP
 ========================================================= */
 
-function slidesMarkup(folder, count) {
+function slidesMarkup(
+    folder,
+    count
+) {
 
     const total =
-        Math.max(1, count);
+        Math.max(
+            1,
+            count
+        );
+
 
     const shown =
-        Math.min(3, total);
+        Math.min(
+            3,
+            total
+        );
 
 
     return `
@@ -1788,7 +2478,16 @@ function slidesMarkup(folder, count) {
 
                         <img
                             id="slide${j}"
-                            src="${path(folder, j + 1)}"
+                            src="${path(
+                                folder,
+                                j + 1
+                            )}"
+                            loading="${
+                                j === 0
+                                    ? "eager"
+                                    : "lazy"
+                            }"
+                            decoding="async"
                             onerror="this.src='${fallback}'"
                         >
 
@@ -1796,6 +2495,7 @@ function slidesMarkup(folder, count) {
                             class="caption"
                             id="cap${j}"
                         >
+
                             ${
                                 [
                                     "MERA BACHUU 💗",
@@ -1803,6 +2503,7 @@ function slidesMarkup(folder, count) {
                                     "MISS RAIKWAR JI 🌸"
                                 ][j]
                             }
+
                         </div>
 
                     </div>
@@ -1812,9 +2513,12 @@ function slidesMarkup(folder, count) {
 
         </div>
 
+
         <div class="controls">
 
-            <button onclick="moveSlide(-1)">
+            <button
+                onclick="moveSlide(-1)"
+            >
                 ←
             </button>
 
@@ -1822,7 +2526,9 @@ function slidesMarkup(folder, count) {
                 01 / ${total}
             </span>
 
-            <button onclick="moveSlide(1)">
+            <button
+                onclick="moveSlide(1)"
+            >
                 →
             </button>
 
@@ -1837,20 +2543,35 @@ function slidesMarkup(folder, count) {
    MOVE SLIDE
 ========================================================= */
 
-function moveSlide(dir) {
+function moveSlide(
+    dir
+) {
 
-    const page = PAGES[current];
+    const page =
+        PAGES[current];
+
 
     if (!page) {
         return;
     }
 
-    const folder = page[4];
-    const count = page[5];
 
-    if (count <= 3) {
+    const folder =
+        page[4];
+
+
+    const count =
+        page[5];
+
+
+    if (
+        count <= 3
+    ) {
+
         return;
+
     }
+
 
     slide =
         (
@@ -1860,12 +2581,17 @@ function moveSlide(dir) {
         ) % count;
 
 
-    for (let j = 0; j < 3; j++) {
+    for (
+        let j = 0;
+        j < 3;
+        j++
+    ) {
 
         const image =
             document.getElementById(
                 "slide" + j
             );
+
 
         if (image) {
 
@@ -1875,19 +2601,47 @@ function moveSlide(dir) {
                     j
                 ) % count;
 
-            image.style.opacity = "0";
+
+            const src =
+                path(
+                    folder,
+                    index + 1
+                );
+
+
+            /*
+               Preload image before
+               changing visible image.
+            */
+
+            preloadImage(src);
+
+
+            image.style.opacity =
+                "0";
+
 
             setTimeout(() => {
 
+                if (
+                    current !==
+                    PAGES.indexOf(page)
+                ) {
+
+                    return;
+
+                }
+
+
                 image.src =
-                    path(
-                        folder,
-                        index + 1
-                    );
+                    src;
 
-                image.style.opacity = "1";
 
-            }, 220);
+                image.style.opacity =
+                    "1";
+
+
+            }, 180);
 
         }
 
@@ -1898,6 +2652,7 @@ function moveSlide(dir) {
         document.getElementById(
             "dots"
         );
+
 
     if (dots) {
 
@@ -1948,18 +2703,25 @@ function cake() {
 
                 </div>
 
+
                 <div
                     class="emoji-cake"
                     aria-label="Birthday cake"
                 >
+
                     🎂
+
                 </div>
 
             </div>
 
+
             <p class="cake-instruction">
+
                 Blow up the candles
+
             </p>
+
 
             <div
                 class="letter"
@@ -1970,15 +2732,19 @@ function cake() {
                     My Dear Love,
                 </h2>
 
+
                 <p>
                     ${CONFIG.message}
                 </p>
+
 
                 <button
                     class="primary"
                     onclick="next()"
                 >
+
                     Open the final page ✨
+
                 </button>
 
             </div>
@@ -1998,55 +2764,73 @@ function bindCandles() {
 
     document
         .querySelectorAll(".candle")
-        .forEach(candle => {
+        .forEach(
+            candle => {
 
-            candle.onclick = () => {
+                candle.onclick =
+                    () => {
 
-                if (
-                    candle.classList.contains(
-                        "off"
-                    )
-                ) {
-                    return;
-                }
+                        if (
+                            candle.classList.contains(
+                                "off"
+                            )
+                        ) {
 
-                candle.classList.add("off");
+                            return;
 
-
-                const remaining =
-                    document.querySelectorAll(
-                        ".candle:not(.off)"
-                    ).length;
+                        }
 
 
-                if (remaining === 0) {
+                        candle.classList.add(
+                            "off"
+                        );
 
-                    setTimeout(() => {
 
-                        const letter =
-                            document.getElementById(
-                                "letter"
-                            );
+                        const remaining =
+                            document.querySelectorAll(
+                                ".candle:not(.off)"
+                            ).length;
 
-                        if (letter) {
 
-                            letter.classList.add(
-                                "show"
+                        if (
+                            remaining === 0
+                        ) {
+
+                            setTimeout(
+                                () => {
+
+                                    const letter =
+                                        document.getElementById(
+                                            "letter"
+                                        );
+
+
+                                    if (
+                                        letter
+                                    ) {
+
+                                        letter.classList.add(
+                                            "show"
+                                        );
+
+                                    }
+
+
+                                    fireworks(
+                                        NORMAL_FIREWORK_DURATION
+                                    );
+
+
+                                },
+                                650
                             );
 
                         }
 
-                        fireworks(
-                            NORMAL_FIREWORK_DURATION
-                        );
+                    };
 
-                    }, 650);
-
-                }
-
-            };
-
-        });
+            }
+        );
 
 }
 
@@ -2065,10 +2849,13 @@ function note() {
 
                 <img
                     src="assets/images/notes/handwritten.jpg"
+                    loading="lazy"
+                    decoding="async"
                     onerror="this.src='assets/cats/note-placeholder.jpeg'"
                 >
 
             </div>
+
 
             <div class="video-box">
 
@@ -2079,8 +2866,11 @@ function note() {
                     src="assets/video/my-message.mp4"
                 ></video>
 
+
                 <p class="lead">
+
                     "Jo saamne bolna mushkil tha… video mein bol diya. ❤️"
+
                 </p>
 
             </div>
@@ -2108,9 +2898,11 @@ function finalPage() {
                     🐈‍⬛
                 </div>
 
+
                 <div class="kicker">
                     THE LAST PAGE
                 </div>
+
 
                 <h1>
 
@@ -2122,6 +2914,7 @@ function finalPage() {
 
                 </h1>
 
+
                 <p class="quote">
 
                     Meowww 🐾<br>
@@ -2131,6 +2924,7 @@ function finalPage() {
                     </span>
 
                 </p>
+
 
                 <p class="lead">
                     ${CONFIG.message}
@@ -2149,27 +2943,53 @@ function finalPage() {
    MUSIC
 ========================================================= */
 
-function setTrack(i) {
+function setTrack(
+    i
+) {
 
     track = i;
+
 
     if (!audio) {
         return;
     }
 
+
     audio.pause();
-    audio.currentTime = 0;
+
+
+    /*
+       Reset only if possible.
+    */
+
+    try {
+        audio.currentTime = 0;
+    }
+    catch (e) {}
+
 
     audio.src =
         CONFIG.music[i];
 
-    audio.loop = true;
+
+    audio.loop =
+        true;
+
+
+    /*
+       PERFORMANCE:
+       Don't force full song download.
+    */
+
+    audio.preload =
+        "metadata";
 
 
     const volume =
         document.getElementById(
             "volume"
         );
+
 
     if (volume) {
 
@@ -2184,6 +3004,7 @@ function setTrack(i) {
             "trackName"
         );
 
+
     if (trackName) {
 
         trackName.textContent =
@@ -2194,9 +3015,25 @@ function setTrack(i) {
     }
 
 
-    audio
-        .play()
-        .catch(() => {});
+    /*
+       Give browser a moment to
+       release previous audio.
+    */
+
+    const promise =
+        audio.play();
+
+
+    if (
+        promise &&
+        promise.catch
+    ) {
+
+        promise.catch(
+            () => {}
+        );
+
+    }
 
 }
 
@@ -2205,13 +3042,17 @@ function setTrack(i) {
    RENDER
 ========================================================= */
 
-function render(i) {
+function render(
+    i
+) {
 
     if (
         i < 0 ||
         i >= PAGES.length
     ) {
+
         return;
+
     }
 
 
@@ -2227,35 +3068,55 @@ function render(i) {
 
     stopNormalFireworks();
 
-    current = i;
-    slide = 0;
 
-    clearInterval(timer);
+    clearInterval(
+        timer
+    );
 
 
-    const page = PAGES[i];
+    current =
+        i;
 
-    const isCake = i === 5;
-    const isFinal = i === 6;
+
+    slide =
+        0;
+
+
+    const page =
+        PAGES[i];
+
+
+    const isCake =
+        i === 5;
+
+
+    const isFinal =
+        i === 6;
+
 
     let special;
 
 
     if (isCake) {
 
-        special = cake();
+        special =
+            cake();
 
     }
 
-    else if (i === 4) {
+    else if (
+        i === 4
+    ) {
 
-        special = note();
+        special =
+            note();
 
     }
 
     else if (isFinal) {
 
-        special = finalPage();
+        special =
+            finalPage();
 
     }
 
@@ -2270,10 +3131,14 @@ function render(i) {
     }
 
 
-    let heroButton = "";
+    let heroButton =
+        "";
 
 
-    if (!isCake && !isFinal) {
+    if (
+        !isCake &&
+        !isFinal
+    ) {
 
         heroButton = `
 
@@ -2281,7 +3146,9 @@ function render(i) {
                 class="primary"
                 onclick="next()"
             >
+
                 Next chapter →
+
             </button>
 
         `;
@@ -2290,7 +3157,8 @@ function render(i) {
 
 
     const nextButton =
-        i < 6 && !isCake
+        i < 6 &&
+        !isCake
 
             ? `
 
@@ -2298,7 +3166,9 @@ function render(i) {
                     class="secondary"
                     onclick="next()"
                 >
+
                     Next →
+
                 </button>
 
             `
@@ -2308,19 +3178,81 @@ function render(i) {
 
     const leads = [
 
-        `It’s been 21 years, 7,670 days, 184,080 hours, 11,044,800 minutes, 662,688,000 seconds, and countless beautiful moments of you being you ❤️ And after all this time, I just want you to know how incredibly special you are to me, Meri Jaya, meri Cutie Pie, meri Sugarplum, tumhari smile mere liye duniya ki sabse beautiful cheezon mein se ek hai, Tumhare saath bitaya har moment mere liye ek precious memory hai, chahe woh random conversations ho, games ho, hasi mazaak ho, ya bas ek dusre ko annoy karna ho, I love every little part of it, I hope tumhari life hamesha happiness, success aur beautiful memories se filled rahe, aur tumhare saare dreams slowly slowly reality bane, Bas aise hi hamesha khush rehna, smile karti rehna, aur meri wahi cute si Jaya rehna, Happy Birthday meri Jaya ❤️ Meowww forever 🐾❤️`,
+        `
+        It’s been 21 years, 7,670 days, 184,080 hours,
+        11,044,800 minutes, 662,688,000 seconds,
+        and countless beautiful moments of you being you ❤️
+        And after all this time, I just want you to know
+        how incredibly special you are to me, Meri Jaya,
+        meri Cutie Pie, meri Sugarplum, tumhari smile mere
+        liye duniya ki sabse beautiful cheezon mein se ek hai,
+        Tumhare saath bitaya har moment mere liye ek precious
+        memory hai, chahe woh random conversations ho, games ho,
+        hasi mazaak ho, ya bas ek dusre ko annoy karna ho,
+        I love every little part of it, I hope tumhari life
+        hamesha happiness, success aur beautiful memories se
+        filled rahe, aur tumhare saare dreams slowly slowly
+        reality bane, Bas aise hi hamesha khush rehna,
+        smile karti rehna, aur meri wahi cute si Jaya rehna,
+        Happy Birthday meri Jaya ❤️ Meowww forever 🐾❤️
+        `,
 
-        `Meri Jaya, meri Cutie Pie, meri Sugarplum, Happy Birthday to the most special person in my little world ❤️ Aaj ka din sirf tumhara birthday nahi hai, its a celebration of you, the person who somehow makes ordinary moments feel a little more beautiful, Kabhi kabhi mujhe samajh nahi aata ki main words mein exactly kaise explain karun ki tum mere liye kitni special ho, Bas itna pata hai ki tumhari ek smile mera pura mood change kar sakti hai, aur tumhari ek chhoti si baat bhi kabhi kabhi mere din ka favourite moment ban jaati hai, Meri Cutie Pie, tumhare saath bitaye hue moments mere liye sirf memories nahi hain, they are little pieces of happiness that I want to keep forever, Chahe hum game khel rahe ho, random baatein kar rahe ho, ya bas ek dusre ko annoy kar rahe ho, somehow everything becomes special because its us, Meri Sugarplum, I hope tum hamesha smile karti raho, apne dreams chase karo, aur life mein woh sab pao jo tum deserve karti ho, Aur haan, thoda sa pagalpan aur cute drama bhi hamesha maintain rakhna 😂❤️ Thank you for being you, Thank you for every laugh, every memory, every little moment, Happy Birthday, meri Jaya, Stay happy, stay crazy, stay beautifully you, Meowww forever, Cutie Pie 🐾❤️`,
+        `
+        Meri Jaya, meri Cutie Pie, meri Sugarplum,
+        Happy Birthday to the most special person in my little world ❤️
+        Aaj ka din sirf tumhara birthday nahi hai,
+        its a celebration of you, the person who somehow
+        makes ordinary moments feel a little more beautiful,
+        Kabhi kabhi mujhe samajh nahi aata ki main words mein
+        exactly kaise explain karun ki tum mere liye kitni special ho,
+        Bas itna pata hai ki tumhari ek smile mera pura mood change
+        kar sakti hai, aur tumhari ek chhoti si baat bhi kabhi kabhi
+        mere din ka favourite moment ban jaati hai, Meri Cutie Pie,
+        tumhare saath bitaye hue moments mere liye sirf memories
+        nahi hain, they are little pieces of happiness that I want
+        to keep forever, Chahe hum game khel rahe ho,
+        random baatein kar rahe ho, ya bas ek dusre ko annoy
+        kar rahe ho, somehow everything becomes special because
+        its us, Meri Sugarplum, I hope tum hamesha smile karti raho,
+        apne dreams chase karo, aur life mein woh sab pao jo tum
+        deserve karti ho, Aur haan, thoda sa pagalpan aur cute drama
+        bhi hamesha maintain rakhna 😂❤️ Thank you for being you,
+        Thank you for every laugh, every memory, every little moment,
+        Happy Birthday, meri Jaya, Stay happy, stay crazy,
+        stay beautifully you, Meowww forever, Cutie Pie 🐾❤️
+        `,
 
-        `Kuch moments loud hote hain, kuch quietly favourite ban jaate hain.`,
+        `
+        Kuch moments loud hote hain,
+        kuch quietly favourite ban jaate hain.
+        `,
 
-        `Humare game screenshots — because kuch fights screen par hoti hain aur kuch sirf hasi ke liye.`,
+        `
+        Humare game screenshots —
+        because kuch fights screen par hoti hain
+        aur kuch sirf hasi ke liye.
+        `,
 
-        `MERA BACHUU, ye page thoda personal hai. Ye page thoda personal hai, kyunki kabhi kabhi humari misunderstandings ki wajah se fights ho jaati hain, but meri Jaya, please kisi bhi moment ko permanent mat samajhna, har problem ke baad things better ho sakti hain, bas mujhpar aur humpar thoda sa trust rakhna, kyunki misunderstandings temporary hoti hain, but what we mean to each other is much more special ❤️`,
+        `
+        MERA BACHUU, ye page thoda personal hai.
+        Ye page thoda personal hai, kyunki kabhi kabhi
+        humari misunderstandings ki wajah se fights ho jaati hain,
+        but meri Jaya, please kisi bhi moment ko permanent
+        mat samajhna, har problem ke baad things better ho sakti hain,
+        bas mujhpar aur humpar thoda sa trust rakhna,
+        kyunki misunderstandings temporary hoti hain,
+        but what we mean to each other is much more special ❤️
+        `,
 
-        `Cake ko touch karke candles ek-ek karke bujhana. Tumhare liye kuch hai last candle mein.`,
+        `
+        Cake ko touch karke candles ek-ek karke bujhana.
+        Tumhare liye kuch hai last candle mein.
+        `,
 
-        `No more spoilers. Bas ek birthday wish, straight from me.`
+        `
+        No more spoilers.
+        Bas ek birthday wish, straight from me.
+        `
 
     ];
 
@@ -2335,14 +3267,19 @@ function render(i) {
 
         "Game moments.",
 
-        "From me, to you.",
+        "From me, to you, kitne pyare lg re haaye mere bchuuuuuu hehehhe kr re.......muahhhhhhhh muahhhhhh muahhhhh >3.",
 
-        "Make a wish.",
+        "Make a wish. And Mahadev ji bless u a lott tumko duniya ki har khushi mile , tumahri saari problms bhagvan ji khtm kr dege , hmesha muskurate rhooo.",
 
-        "The last little corner."
+        "The last little corner, if meko life me kbhi bhi ek mauka mile to me is choti jaya se milne jarur jauga past m , haye mera innocent bchuu meri little cat ."
 
     ];
 
+
+    /*
+       Background image
+       remains same visually.
+    */
 
     const background =
         `background-image:url('${CONFIG.backgrounds[i]}')`;
@@ -2365,17 +3302,21 @@ function render(i) {
                             CHAPTER ${page[0]} • MEOW WORLD
                         </div>
 
+
                         <h1>
                             ${page[1]}
                         </h1>
+
 
                         <p class="quote">
                             ${page[2]}
                         </p>
 
+
                         <p class="lead">
                             ${leads[i]}
                         </p>
+
 
                         ${heroButton}
 
@@ -2386,6 +3327,8 @@ function render(i) {
 
                         <img
                             src="assets/cats/${page[3]}"
+                            loading="eager"
+                            decoding="async"
                             onerror="this.src='${fallback}'"
                         >
 
@@ -2400,9 +3343,11 @@ function render(i) {
                         A LITTLE CORNER
                     </div>
 
+
                     <h2>
                         ${sectionTitles[i]}
                     </h2>
+
 
                     ${special}
 
@@ -2420,13 +3365,16 @@ function render(i) {
                                     class="secondary"
                                     onclick="prev()"
                                 >
+
                                     ← Previous chapter
+
                                 </button>
 
                             `
 
                             : "<span></span>"
                     }
+
 
                     ${nextButton}
 
@@ -2439,39 +3387,82 @@ function render(i) {
     `;
 
 
+    /* =====================================================
+       PROGRESS
+    ===================================================== */
+
     const progress =
         document.getElementById(
             "progress"
         );
 
+
     if (progress) {
 
         progress.style.width =
-            (i / 6 * 100) +
-            "%";
+            (
+                i /
+                6 *
+                100
+            ) + "%";
 
     }
 
 
+    /* =====================================================
+       MUSIC
+    ===================================================== */
+
     setTrack(i);
 
 
-    if (isCake) {
+    /* =====================================================
+       CAKE
+    ===================================================== */
+
+    if (
+        isCake
+    ) {
 
         bindCandles();
 
     }
 
 
-    if (page[5] > 3) {
+    /* =====================================================
+       SLIDESHOW
+    ===================================================== */
+
+    if (
+        page[5] > 3
+    ) {
 
         timer =
             setInterval(
-                () => moveSlide(1),
+                () => {
+
+                    if (
+                        current === i
+                    ) {
+
+                        moveSlide(1);
+
+                    }
+
+                },
                 3200
             );
 
     }
+
+
+    /* =====================================================
+       PRELOAD CURRENT + NEXT
+    ===================================================== */
+
+    preloadPageImages(i);
+
+    preloadNextPage(i);
 
 
     window.scrollTo({
@@ -2483,24 +3474,45 @@ function render(i) {
     });
 
 
-    if (isFinal) {
+    /* =====================================================
+       FINAL PAGE
+    ===================================================== */
+
+    if (
+        isFinal
+    ) {
 
         startFinalPageEffect();
 
     }
 
+
+    /* =====================================================
+       OTHER PAGES
+    ===================================================== */
+
     else {
 
         setTimeout(() => {
 
-            if (current !== i) {
+            if (
+                current !== i
+            ) {
+
                 return;
+
             }
+
 
             pageFireworks();
 
-            if (i === 0) {
+
+            if (
+                i === 0
+            ) {
+
                 playChapterOneFireworkSound();
+
             }
 
         }, 1000);
@@ -2514,19 +3526,32 @@ function render(i) {
    TRANSITION
 ========================================================= */
 
-function transition(nextPage) {
+function transition(
+    nextPage
+) {
 
-    if (busy) {
+    if (
+        busy
+    ) {
+
         return;
+
     }
 
-    busy = true;
+
+    busy =
+        true;
+
 
     stopNormalFireworks();
 
 
-    if (current === 6) {
+    if (
+        current === 6
+    ) {
+
         stopFinalFireworksLoop();
+
     }
 
 
@@ -2538,9 +3563,12 @@ function transition(nextPage) {
 
     if (!layer) {
 
-        render(nextPage);
+        render(
+            nextPage
+        );
 
-        busy = false;
+        busy =
+            false;
 
         return;
 
@@ -2551,19 +3579,28 @@ function transition(nextPage) {
         '<div class="trans-bg"></div>';
 
 
-    if (current === 0) {
+    if (
+        current === 0
+    ) {
 
         const pics = [
+
             1,
             2,
             3,
             4
+
         ].map(
+
             n =>
                 path(
                     PAGES[nextPage][4],
-                    n
+                    Math.min(
+                        n,
+                        PAGES[nextPage][5]
+                    )
                 )
+
         );
 
 
@@ -2588,6 +3625,8 @@ function transition(nextPage) {
 
                             <img
                                 src="${src}"
+                                loading="lazy"
+                                decoding="async"
                                 onerror="this.src='${fallback}'"
                             >
 
@@ -2610,12 +3649,15 @@ function transition(nextPage) {
     ) {
 
         const pics = [
+
             1,
             2,
             3,
             4,
             5
+
         ].map(
+
             n =>
                 path(
                     PAGES[nextPage][4],
@@ -2624,6 +3666,7 @@ function transition(nextPage) {
                         PAGES[nextPage][5]
                     )
                 )
+
         );
 
 
@@ -2642,6 +3685,8 @@ function transition(nextPage) {
 
                         <img
                             src="${src}"
+                            loading="lazy"
+                            decoding="async"
                             onerror="this.src='${fallback}'"
                         >
 
@@ -2656,18 +3701,27 @@ function transition(nextPage) {
     }
 
 
-    layer.style.display = "block";
+    layer.style.display =
+        "block";
 
 
     setTimeout(() => {
 
-        render(nextPage);
+        render(
+            nextPage
+        );
 
-        layer.style.display = "none";
 
-        layer.innerHTML = "";
+        layer.style.display =
+            "none";
 
-        busy = false;
+
+        layer.innerHTML =
+            "";
+
+
+        busy =
+            false;
 
     }, 1900);
 
@@ -2675,7 +3729,7 @@ function transition(nextPage) {
 
 
 /* =========================================================
-   NEXT / PREVIOUS
+   NEXT
 ========================================================= */
 
 function next() {
@@ -2694,9 +3748,15 @@ function next() {
 }
 
 
+/* =========================================================
+   PREVIOUS
+========================================================= */
+
 function prev() {
 
-    if (current > 0) {
+    if (
+        current > 0
+    ) {
 
         transition(
             current - 1
@@ -2718,10 +3778,12 @@ function login() {
             "loginId"
         );
 
+
     const passElement =
         document.getElementById(
             "loginPass"
         );
+
 
     const msg =
         document.getElementById(
@@ -2733,12 +3795,15 @@ function login() {
         !idElement ||
         !passElement
     ) {
+
         return;
+
     }
 
 
     const id =
         idElement.value.trim();
+
 
     const password =
         passElement.value;
@@ -2764,13 +3829,16 @@ function login() {
                     "loginScreen"
                 );
 
+
             const app =
                 document.getElementById(
                     "app"
                 );
 
 
-            if (loginScreen) {
+            if (
+                loginScreen
+            ) {
 
                 loginScreen.classList.add(
                     "hidden"
@@ -2779,7 +3847,9 @@ function login() {
             }
 
 
-            if (app) {
+            if (
+                app
+            ) {
 
                 app.classList.remove(
                     "hidden"
@@ -2793,6 +3863,7 @@ function login() {
         }, 1000);
 
     }
+
 
     else {
 
@@ -2818,7 +3889,9 @@ const loginBtn =
     );
 
 
-if (loginBtn) {
+if (
+    loginBtn
+) {
 
     loginBtn.onclick =
         login;
@@ -2866,7 +3939,9 @@ const playTrack =
     );
 
 
-if (playTrack) {
+if (
+    playTrack
+) {
 
     playTrack.onclick =
         () => {
@@ -2876,7 +3951,9 @@ if (playTrack) {
             }
 
 
-            if (audio.paused) {
+            if (
+                audio.paused
+            ) {
 
                 audio
                     .play()
@@ -2907,13 +3984,18 @@ const nextTrack =
     );
 
 
-if (nextTrack) {
+if (
+    nextTrack
+) {
 
     nextTrack.onclick =
         () => {
 
             setTrack(
-                (track + 1) % 7
+                (
+                    track +
+                    1
+                ) % 7
             );
 
         };
@@ -2931,13 +4013,18 @@ const prevTrack =
     );
 
 
-if (prevTrack) {
+if (
+    prevTrack
+) {
 
     prevTrack.onclick =
         () => {
 
             setTrack(
-                (track + 6) % 7
+                (
+                    track +
+                    6
+                ) % 7
             );
 
         };
@@ -2955,12 +4042,16 @@ const volume =
     );
 
 
-if (volume) {
+if (
+    volume
+) {
 
     volume.oninput =
         event => {
 
-            if (audio) {
+            if (
+                audio
+            ) {
 
                 audio.volume =
                     +event.target.value;
@@ -2976,12 +4067,32 @@ if (volume) {
    RESIZE
 ========================================================= */
 
+let resizeTimeout =
+    null;
+
+
 window.addEventListener(
     "resize",
     () => {
 
-        resizeCanvas();
+        clearTimeout(
+            resizeTimeout
+        );
 
+
+        resizeTimeout =
+            setTimeout(
+                () => {
+
+                    resizeCanvas();
+
+                },
+                150
+            );
+
+    },
+    {
+        passive: true
     }
 );
 
@@ -2998,6 +4109,13 @@ floats();
 ========================================================= */
 
 resizeCanvas();
+
+
+/* =========================================================
+   INITIAL PAGE PRELOAD
+========================================================= */
+
+preloadPageImages(0);
 
 
 /* =========================================================
