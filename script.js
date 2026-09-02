@@ -28,9 +28,9 @@
 
 const CONFIG = {
 
-    id: "1",
+    id: "Jayu",
 
-    password: "1",
+    password: "14/03/2026",
 
     name: "Jaya",
 
